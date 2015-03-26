@@ -1,4 +1,4 @@
-/* Copyright (c) 2009-2011, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2009-2012, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -16,8 +16,6 @@
  */
 #include "drmP.h"
 #include "drm.h"
-#include <linux/android_pmem.h>
-#include <linux/notifier.h>
 
 #include "kgsl.h"
 #include "kgsl_device.h"
@@ -274,12 +272,33 @@ kgsl_gem_alloc_memory(struct drm_gem_object *obj)
 	if (kgsl_gem_memory_allocated(obj) || TYPE_IS_FD(priv->type))
 		return 0;
 
+	if (priv->pagetable == NULL) {
+		priv->pagetable = kgsl_mmu_getpagetable(KGSL_MMU_GLOBAL_PT);
+
+		if (priv->pagetable == NULL) {
+			DRM_ERROR("Unable to get the GPU MMU pagetable\n");
+			return -EINVAL;
+		}
+	}
+
+	/* Set the flags for the memdesc (probably 0, unless it is cached) */
+	priv->memdesc.priv = 0;
+
 	if (TYPE_IS_PMEM(priv->type)) {
 		int type;
 
 		if (priv->type == DRM_KGSL_GEM_TYPE_EBI ||
-		    priv->type & DRM_KGSL_GEM_PMEM_EBI)
-			type = PMEM_MEMTYPE_EBI1;
+		    priv->type & DRM_KGSL_GEM_PMEM_EBI) {
+				result = kgsl_sharedmem_ebimem_user(
+						&priv->memdesc,
+						priv->pagetable,
+						obj->size * priv->bufcount);
+				if (result) {
+					DRM_ERROR(
+					"Unable to allocate PMEM memory\n");
+					return result;
+				}
+		}
 		else
 			type = PMEM_MEMTYPE_SMI;
 
@@ -297,7 +316,7 @@ kgsl_gem_alloc_memory(struct drm_gem_object *obj)
 	} else if (TYPE_IS_MEM(priv->type)) {
 		result = kgsl_sharedmem_page_alloc(&priv->memdesc,
 					priv->pagetable,
-					obj->size * priv->bufcount, 0);
+					obj->size * priv->bufcount);
 
 		if (priv->memdesc.hostptr == NULL) {
 			DRM_ERROR("Unable to allocate vmalloc memory\n");
