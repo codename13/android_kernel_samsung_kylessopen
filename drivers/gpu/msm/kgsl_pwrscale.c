@@ -1,4 +1,4 @@
-/* Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2010-2012, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -223,18 +223,18 @@ EXPORT_SYMBOL(kgsl_pwrscale_wake);
 
 void kgsl_pwrscale_busy(struct kgsl_device *device)
 {
-	if (PWRSCALE_ACTIVE(device) && device->pwrscale.policy->busy)
-		device->pwrscale.policy->busy(device,
-				&device->pwrscale);
+	if (device->pwrscale.policy && device->pwrscale.policy->busy)
+		if (!device->pwrscale.gpu_busy)
+			device->pwrscale.policy->busy(device,
+					&device->pwrscale);
+	device->pwrscale.gpu_busy = 1;
 }
-EXPORT_SYMBOL(kgsl_pwrscale_busy);
 
 void kgsl_pwrscale_idle(struct kgsl_device *device)
 {
-	if (PWRSCALE_ACTIVE(device) && device->pwrscale.policy->idle)
-		if (device->state == KGSL_STATE_ACTIVE)
-			device->pwrscale.policy->idle(device,
-					&device->pwrscale);
+	if (device->pwrscale.policy && device->pwrscale.policy->idle)
+		device->pwrscale.policy->idle(device, &device->pwrscale);
+	device->pwrscale.gpu_busy = 0;
 }
 EXPORT_SYMBOL(kgsl_pwrscale_idle);
 
@@ -273,12 +273,6 @@ static void _kgsl_pwrscale_detach_policy(struct kgsl_device *device)
 {
 	if (device->pwrscale.policy != NULL) {
 		device->pwrscale.policy->close(device, &device->pwrscale);
-
-		/*
-		 * Try to set max pwrlevel which will be limited to thermal by
-		 * kgsl_pwrctrl_pwrlevel_change if thermal is indeed lower
-		 */
-
 		kgsl_pwrctrl_pwrlevel_change(device,
 				device->pwrctrl.thermal_pwrlevel);
 	}
@@ -312,9 +306,6 @@ int kgsl_pwrscale_attach_policy(struct kgsl_device *device,
 		_kgsl_pwrscale_detach_policy(device);
 
 	device->pwrscale.policy = policy;
-
-	/* Pwrscale is enabled by default at attach time */
-	kgsl_pwrscale_enable(device);
 
 	if (policy) {
 		ret = device->pwrscale.policy->init(device, &device->pwrscale);
