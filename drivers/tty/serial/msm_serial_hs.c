@@ -1275,14 +1275,8 @@ static void msm_hs_enable_ms_locked(struct uart_port *uport)
 	/* Calling CLOCK API. Hence mb() requires here. */
 	mb();
 
-}
+	clk_disable(msm_uport->clk);
 
-static void msm_hs_flush_buffer_locked(struct uart_port *uport)
-{
-	struct msm_hs_port *msm_uport = UARTDM_TO_MSM(uport);
-
-	if (msm_uport->tx.dma_in_flight)
-		msm_uport->tty_flush_receive = true;
 }
 
 /*
@@ -2292,7 +2286,6 @@ static struct uart_ops msm_hs_ops = {
 	.config_port = msm_hs_config_port,
 	.release_port = msm_hs_release_port,
 	.request_port = msm_hs_request_port,
-	.flush_buffer = msm_hs_flush_buffer_locked,
 };
 
 module_init(msm_serial_hs_init);

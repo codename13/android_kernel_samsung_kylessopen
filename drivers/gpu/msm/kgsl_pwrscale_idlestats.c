@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -111,26 +111,13 @@ static void idlestats_busy(struct kgsl_device *device,
 			spin_unlock(&priv->cpu_info.lock);
 		}
 		priv->pulse.wait_interval /= nr_cpu;
-
-		/* This is called from within a mutex protected function, so
-		   no additional locking required */
-		device->ftbl->power_stats(device, &stats);
-
-		/* If total_time is zero, then we don't have
-		   any interesting statistics to store */
-		if (stats.total_time == 0) {
-			priv->pulse.busy_start_time = 0;
-			return;
-		}
-
-		priv->pulse.busy_interval = stats.busy_time;
 		msm_idle_stats_idle_end(&priv->idledev, &priv->pulse);
 	}
 	priv->pulse.busy_start_time = ktime_to_us(ktime_get());
 }
 
 static void idlestats_idle(struct kgsl_device *device,
-		struct kgsl_pwrscale *pwrscale)
+			struct kgsl_pwrscale *pwrscale)
 {
 	int i, nr_cpu;
 	struct kgsl_power_stats stats;
@@ -164,14 +151,6 @@ static void idlestats_sleep(struct kgsl_device *device,
 	struct idlestats_priv *priv = pwrscale->priv;
 	msm_idle_stats_update_event(&priv->idledev,
 		MSM_IDLE_STATS_EVENT_IDLE_TIMER_EXPIRED);
-}
-
-static void idlestats_wake(struct kgsl_device *device,
-			struct kgsl_pwrscale *pwrscale)
-{
-	/* Use highest perf level on wake-up from
-	   sleep for better performance */
-	kgsl_pwrctrl_pwrlevel_change(device, KGSL_PWRLEVEL_TURBO);
 }
 
 static int idlestats_init(struct kgsl_device *device,
